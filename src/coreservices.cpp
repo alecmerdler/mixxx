@@ -26,6 +26,9 @@
 #include "library/library_decl.h"
 #include "library/library_prefs.h"
 #include "library/overviewcache.h"
+#ifdef __STEM_SEPARATION__
+#include "track/stemseparation/stemseparationcontroller.h"
+#endif
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "mixer/playerinfo.h"
@@ -582,6 +585,10 @@ void CoreServices::initialize() {
             m_pPlayerManager.get(),
             m_pRecordingManager.get());
 
+#ifdef __STEM_SEPARATION__
+    mixxx::StemSeparationController::createInstance(pConfig);
+#endif
+
     OverviewCache* pOverviewCache = OverviewCache::createInstance(pConfig, m_pDbConnectionPool);
     connect(&(m_pTrackCollectionManager->internalCollection()->getTrackDAO()),
             &TrackDAO::waveformSummaryUpdated,
@@ -900,6 +907,10 @@ void CoreServices::finalize() {
     CoverArtCache::destroy();
 
     Clipboard::destroy();
+
+#ifdef __STEM_SEPARATION__
+    mixxx::StemSeparationController::destroy();
+#endif
 
     // PlayerManager depends on Engine, SoundManager, VinylControlManager, and Config
     // The player manager has to be deleted before the library to ensure

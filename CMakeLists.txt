@@ -2867,6 +2867,42 @@ if(STEM)
   endif()
 endif()
 
+# AI-based stem separation (on-device source separation of regular tracks
+# into the same drums/bass/vocals/other stem slots used by STEM file support)
+option(STEM_SEPARATION "AI-based stem separation (requires Eigen3, ONNX Runtime)" OFF)
+if(STEM_SEPARATION)
+  if(NOT STEM)
+    message(FATAL_ERROR "STEM_SEPARATION requires that also STEM is enabled")
+  endif()
+
+  find_package(Eigen3 REQUIRED)
+  find_package(onnxruntime REQUIRED)
+
+  # Vendored inference library from https://github.com/sevagh/demucs.onnx
+  # (MIT licensed, see lib/demucsonnx/LICENSE and README.mixxx.md)
+  add_library(
+    DemucsOnnx
+    STATIC
+    EXCLUDE_FROM_ALL
+    lib/demucsonnx/dsp.cpp
+    lib/demucsonnx/model_apply.cpp
+    lib/demucsonnx/model_inference.cpp
+  )
+  target_compile_features(DemucsOnnx PUBLIC cxx_std_17)
+  target_include_directories(DemucsOnnx SYSTEM PUBLIC lib/demucsonnx)
+  target_link_libraries(DemucsOnnx PUBLIC Eigen3::Eigen onnxruntime::onnxruntime)
+
+  target_compile_definitions(mixxx-lib PUBLIC __STEM_SEPARATION__)
+  target_sources(
+    mixxx-lib
+    PRIVATE
+      src/track/stemseparation/stemcontainerwriter.cpp
+      src/track/stemseparation/stemseparationcontroller.cpp
+      src/track/stemseparation/stemseparator.cpp
+  )
+  target_link_libraries(mixxx-lib PRIVATE DemucsOnnx)
+endif()
+
 if(BUILD_TESTING)
   set(
     src-mixxx-test

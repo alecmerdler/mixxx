@@ -593,4 +593,14 @@ reapplying those migrations.
       ALTER TABLE library ADD COLUMN tuning_frequency_hz FLOAT DEFAULT 0.0;
     </sql>
   </revision>
+  <revision version="41" min_compatible="3">
+    <description>
+      Add stems_path column to the library table, used to store the
+      location of the AI-generated STEM container file for a track, if
+      one has been separated.
+    </description>
+    <sql>
+      ALTER TABLE library ADD COLUMN stems_path TEXT DEFAULT '';
+    </sql>
+  </revision>
 </schema>

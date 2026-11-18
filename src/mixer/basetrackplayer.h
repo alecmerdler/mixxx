@@ -135,6 +135,14 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     /// Slot for change signals from WStarRating (absolute values)
     void slotTrackRatingChangeRequest(int rating) final;
     void slotPlayToggled(double);
+#ifdef __STEM_SEPARATION__
+    void slotStemSeparate(double pressed);
+    void slotStemSeparationStarted(TrackId trackId);
+    void slotStemSeparationProgress(TrackId trackId,
+            float progress,
+            const QString& statusMessage);
+    void slotStemSeparationFinished(TrackId trackId, bool success);
+#endif
 
   private slots:
     void slotCloneChannel(EngineChannel* pChannel);
@@ -163,6 +171,12 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
 
     void connectLoadedTrack();
     void disconnectLoadedTrack();
+
+#ifdef __STEM_SEPARATION__
+    /// True if trackId is the track loaded in this (primary) deck, i.e. if
+    /// separation updates for it should be reflected by this deck.
+    bool isStemSeparationTrackLoaded(TrackId trackId) const;
+#endif
 
     UserSettingsPointer m_pConfig;
     EngineMixer* m_pEngineMixer;
@@ -195,6 +209,15 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
 #ifdef __STEM__
     // Stems color
     std::vector<std::unique_ptr<ControlObject>> m_pStemColors;
+#endif
+#ifdef __STEM_SEPARATION__
+    // Triggers AI-based stem separation of the loaded track. See
+    // StemSeparationController.
+    std::unique_ptr<ControlPushButton> m_pStemSeparate;
+    // Read-only progress of the separation job for the loaded track:
+    // 0.0 ... 1.0 while running, -1 while idle. Skins and controller
+    // mappings can bind to this to show their own progress indicator.
+    std::unique_ptr<ControlObject> m_pStemSeparateProgress;
 #endif
 
     // Waveform display related controls

@@ -476,6 +476,9 @@ void TrackDAO::addTracksPrepare() {
             "beats_sub_version,"
             "beats,"
             "bpm_lock,"
+#ifdef __STEM_SEPARATION__
+            "stems_path,"
+#endif
             "keys_version,"
             "keys_sub_version,"
             "keys,"
@@ -525,6 +528,9 @@ void TrackDAO::addTracksPrepare() {
             ":beats_sub_version,"
             ":beats,"
             ":bpm_lock,"
+#ifdef __STEM_SEPARATION__
+            ":stems_path,"
+#endif
             ":keys_version,"
             ":keys_sub_version,"
             ":keys,"
@@ -611,6 +617,9 @@ void bindTrackLibraryValues(
     pTrackLibraryQuery->bindValue(":cuepoint",
             track.getMainCuePosition().toEngineSamplePosMaybeInvalid());
     pTrackLibraryQuery->bindValue(":bpm_lock", track.getBpmLocked() ? 1 : 0);
+#ifdef __STEM_SEPARATION__
+    pTrackLibraryQuery->bindValue(":stems_path", track.getStemsPath());
+#endif
     pTrackLibraryQuery->bindValue(":tuning_frequency_hz",
             track.getKeys().getGlobalTuningFrequencyHz());
     pTrackLibraryQuery->bindValue(":replaygain", trackInfo.getReplayGain().getRatio());
@@ -1303,6 +1312,12 @@ void setTrackBpmLock(const QSqlRecord& record, const int column, Track* pTrack) 
     pTrack->setBpmLocked(record.value(column).toBool());
 }
 
+#ifdef __STEM_SEPARATION__
+void setTrackStemsPath(const QSqlRecord& record, const int column, Track* pTrack) {
+    pTrack->setStemsPath(record.value(column).toString());
+}
+#endif
+
 void setTrackKey(const QSqlRecord& record, const int column, Track* pTrack) {
     QString keyText = record.value(column).toString();
     QString keysVersion = record.value(column + 1).toString();
@@ -1404,6 +1419,9 @@ TrackPointer TrackDAO::getTrackById(TrackId trackId) const {
             {"beats_sub_version", nullptr},
             {"beats", nullptr},
             {"bpm_lock", setTrackBpmLock},
+#ifdef __STEM_SEPARATION__
+            {"stems_path", setTrackStemsPath},
+#endif
 
             // Key detection columns are handled by setTrackKey. Do not change the
             // ordering of these columns or put other columns in between them!
@@ -1709,6 +1727,9 @@ bool TrackDAO::updateTrack(const Track& track) const {
             "beats_sub_version=:beats_sub_version,"
             "beats=:beats,"
             "bpm_lock=:bpm_lock,"
+#ifdef __STEM_SEPARATION__
+            "stems_path=:stems_path,"
+#endif
             "keys_version=:keys_version,"
             "keys_sub_version=:keys_sub_version,"
             "keys=:keys,"

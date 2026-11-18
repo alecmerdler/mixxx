@@ -35,6 +35,9 @@
 #include "preferences/configobject.h"
 #include "preferences/dialog/dlgprefdeck.h"
 #include "sources/soundsourceproxy.h"
+#ifdef __STEM_SEPARATION__
+#include "track/stemseparation/stemseparationcontroller.h"
+#endif
 #include "track/track.h"
 #include "util/defs.h"
 #include "util/desktophelper.h"
@@ -577,6 +580,14 @@ void WTrackMenu::createActions() {
                 &QAction::triggered,
                 this,
                 &WTrackMenu::slotReanalyzeWithVariableTempo);
+
+#ifdef __STEM_SEPARATION__
+        m_pStemSeparateAction = make_parented<QAction>(tr("Separate Stems (AI)"), this);
+        connect(m_pStemSeparateAction,
+                &QAction::triggered,
+                this,
+                &WTrackMenu::slotStemSeparate);
+#endif
     }
 
     // This action is only usable when m_deckGroup is set. That is true only
@@ -752,6 +763,9 @@ void WTrackMenu::setupActions() {
         m_pAnalyzeMenu->addAction(m_pReanalyzeAction);
         m_pAnalyzeMenu->addAction(m_pReanalyzeConstBpmAction);
         m_pAnalyzeMenu->addAction(m_pReanalyzeVarBpmAction);
+#ifdef __STEM_SEPARATION__
+        m_pAnalyzeMenu->addAction(m_pStemSeparateAction);
+#endif
         addMenu(m_pAnalyzeMenu);
     }
 
@@ -1803,6 +1817,19 @@ void WTrackMenu::slotReanalyzeWithVariableTempo() {
     options.useFixedTempo = false;
     addToAnalysis(options);
 }
+
+#ifdef __STEM_SEPARATION__
+void WTrackMenu::slotStemSeparate() {
+    if (!mixxx::StemSeparationController::isCreated()) {
+        return;
+    }
+    auto* pController = mixxx::StemSeparationController::instance();
+    const TrackPointerList tracks = getTrackPointers();
+    for (const auto& pTrack : tracks) {
+        pController->separateTrack(pTrack);
+    }
+}
+#endif
 
 void WTrackMenu::slotLockBpm() {
     lockBpm(true);

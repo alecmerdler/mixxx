@@ -364,6 +364,19 @@ class Track : public QObject {
     }
 #endif
 
+#ifdef __STEM_SEPARATION__
+    // Absolute path of the AI-generated STEM container file for this track,
+    // or an empty string if stems have not been separated (yet).
+    QString getStemsPath() const {
+        const QMutexLocker lock(&m_qMutex);
+        return m_record.getStemsPath();
+    }
+
+    // Sets or clears the path to the AI-generated STEM container file for
+    // this track and updates getStemInfo()/hasStem() to reflect it.
+    void setStemsPath(QString stemsPath);
+#endif
+
     enum class ImportStatus {
         Pending,
         Complete,

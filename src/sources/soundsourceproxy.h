@@ -69,6 +69,18 @@ class SoundSourceProxy {
             TrackPointer pTrack,
             mixxx::SoundSourceProviderPointer pProvider);
 
+#ifdef __STEM_SEPARATION__
+    // Resolves the audio source used for actual playback, which plays back
+    // the AI-generated STEM container (see Track::getStemsPath()) instead
+    // of the track's own file if one is available. Must only be used for
+    // playback, never for metadata import/export.
+    static SoundSourceProxy forPlayback(TrackPointer pTrack);
+#endif
+
+  private:
+    SoundSourceProxy(TrackPointer pTrack, const QUrl& urlOverride);
+
+  public:
     /// The track object that has been passed at construction.
     ///
     /// Holding an internal pointer to the track object ensures

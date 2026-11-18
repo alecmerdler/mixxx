@@ -162,6 +162,9 @@ class WTrackMenu : public QMenu {
     void slotReanalyze();
     void slotReanalyzeWithFixedTempo();
     void slotReanalyzeWithVariableTempo();
+#ifdef __STEM_SEPARATION__
+    void slotStemSeparate();
+#endif
 
     // BPM
     void slotLockBpm();
@@ -356,6 +359,9 @@ class WTrackMenu : public QMenu {
     // Analysis actions
     parented_ptr<QAction> m_pAnalyzeAction;
     parented_ptr<QAction> m_pReanalyzeAction;
+#ifdef __STEM_SEPARATION__
+    parented_ptr<QAction> m_pStemSeparateAction;
+#endif
     parented_ptr<QAction> m_pReanalyzeConstBpmAction;
     parented_ptr<QAction> m_pReanalyzeVarBpmAction;
 

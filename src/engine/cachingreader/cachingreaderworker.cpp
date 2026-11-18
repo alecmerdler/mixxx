@@ -219,7 +219,11 @@ void CachingReaderWorker::loadTrack(const TrackPointer& pTrack) {
 #ifdef __STEM__
     config.setStemMask(stemMask);
 #endif
+#ifdef __STEM_SEPARATION__
+    m_pAudioSource = SoundSourceProxy::forPlayback(pTrack).openAudioSource(config);
+#else
     m_pAudioSource = SoundSourceProxy(pTrack).openAudioSource(config);
+#endif
     if (!m_pAudioSource) {
         kLogger.warning()
                 << m_group

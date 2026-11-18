@@ -372,6 +372,9 @@ bool operator==(const TrackRecord& lhs, const TrackRecord& rhs) {
             lhs.getColor() == rhs.getColor() &&
             lhs.getMainCuePosition() == rhs.getMainCuePosition() &&
             lhs.getBpmLocked() == rhs.getBpmLocked() &&
+#ifdef __STEM_SEPARATION__
+            lhs.getStemsPath() == rhs.getStemsPath() &&
+#endif
             lhs.getKeys() == rhs.getKeys() &&
             lhs.getRating() == rhs.getRating() &&
             lhs.m_headerParsed == rhs.m_headerParsed;

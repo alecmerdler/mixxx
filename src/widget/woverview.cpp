@@ -15,6 +15,9 @@
 #include "mixer/playermanager.h"
 #include "moc_woverview.cpp"
 #include "preferences/colorpalettesettings.h"
+#ifdef __STEM_SEPARATION__
+#include "track/stemseparation/stemseparationcontroller.h"
+#endif
 #include "track/track.h"
 #include "util/dnd.h"
 #include "util/duration.h"
@@ -31,6 +34,11 @@ namespace {
 // Horizontal and vertical margin around the widget where we accept play pos dragging.
 constexpr int kDragOutsideLimitX = 100;
 constexpr int kDragOutsideLimitY = 50;
+
+#ifdef __STEM_SEPARATION__
+// m_stemSeparationProgress while no separation is running for the shown track.
+constexpr double kStemSeparationProgressNone = -1;
+#endif
 } // anonymous namespace
 
 // for mixxx::OverviewType
@@ -66,6 +74,9 @@ WOverview::WOverview(
           m_iLabelFontSize(10),
           m_maxPixelPos(1.0),
           m_analyzerProgress(kAnalyzerProgressUnknown),
+#ifdef __STEM_SEPARATION__
+          m_stemSeparationProgress(kStemSeparationProgressNone),
+#endif
           m_trackLoaded(false),
           m_pHoveredMark(nullptr),
           m_scaleFactor(1.0),
@@ -141,6 +152,20 @@ WOverview::WOverview(
 
     connect(pPlayerManager, &PlayerManager::trackAnalyzerProgress,
             this, &WOverview::onTrackAnalyzerProgress);
+
+#ifdef __STEM_SEPARATION__
+    if (mixxx::StemSeparationController::isCreated()) {
+        auto* pStemSeparationController = mixxx::StemSeparationController::instance();
+        connect(pStemSeparationController,
+                &mixxx::StemSeparationController::separationProgress,
+                this,
+                &WOverview::onStemSeparationProgress);
+        connect(pStemSeparationController,
+                &mixxx::StemSeparationController::separationFinished,
+                this,
+                &WOverview::onStemSeparationFinished);
+    }
+#endif
 }
 
 void WOverview::setup(const QDomNode& node, const SkinContext& context) {
@@ -369,6 +394,28 @@ void WOverview::onTrackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyz
     }
 }
 
+#ifdef __STEM_SEPARATION__
+void WOverview::onStemSeparationProgress(
+        TrackId trackId, float progress, const QString& statusMessage) {
+    if (!m_pCurrentTrack || (m_pCurrentTrack->getId() != trackId)) {
+        return;
+    }
+    m_stemSeparationProgress = progress;
+    m_stemSeparationStatus = statusMessage;
+    update();
+}
+
+void WOverview::onStemSeparationFinished(TrackId trackId, bool success) {
+    Q_UNUSED(success);
+    if (!m_pCurrentTrack || (m_pCurrentTrack->getId() != trackId)) {
+        return;
+    }
+    m_stemSeparationProgress = kStemSeparationProgressNone;
+    m_stemSeparationStatus.clear();
+    update();
+}
+#endif
+
 void WOverview::slotTrackLoaded(TrackPointer pTrack) {
     Q_UNUSED(pTrack); // only used in DEBUG_ASSERT
     //qDebug() << "WOverview::slotTrackLoaded()" << m_pCurrentTrack.get() << pTrack.get();
@@ -400,6 +447,12 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
     m_actualCompletion = 0;
     m_waveformPeak = -1.0;
     m_pixmapDone = false;
+#ifdef __STEM_SEPARATION__
+    // A separation job in flight for the new track reports its progress on
+    // the next update; until then show nothing rather than the old track's.
+    m_stemSeparationProgress = kStemSeparationProgressNone;
+    m_stemSeparationStatus.clear();
+#endif
     // Note: Here we already have the new track, but the engine and it's
     // Control Objects may still have the old one until the slotTrackLoaded()
     // signal has been received.
@@ -743,6 +796,9 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
         drawPlayPosition(&painter);
         drawEndOfTrackFrame(&painter);
         drawAnalyzerProgress(&painter);
+#ifdef __STEM_SEPARATION__
+        drawStemSeparationProgress(&painter);
+#endif
 
         double trackSamples = getTrackSamples();
         if (trackSamples > 0) {
@@ -982,6 +1038,35 @@ void WOverview::drawAnalyzerProgress(QPainter* pPainter) {
         paintText(tr("Loading track..."), pPainter);
     }
 }
+
+#ifdef __STEM_SEPARATION__
+void WOverview::drawStemSeparationProgress(QPainter* pPainter) {
+    if (m_stemSeparationProgress < 0 || m_stemSeparationProgress >= 1) {
+        return;
+    }
+    PainterScope painterScope(pPainter);
+    const double penWidth = 3 * m_scaleFactor;
+    pPainter->setPen(QPen(m_playPosColor, penWidth));
+
+    // Unlike the analyzer progress line, which marks the not-yet-analyzed
+    // remainder, this fills up from the start as separation proceeds.
+    if (m_orientation == Qt::Horizontal) {
+        const double y = height() - penWidth / 2;
+        pPainter->drawLine(QLineF(0, y, width() * m_stemSeparationProgress, y));
+    } else {
+        const double x = width() - penWidth / 2;
+        pPainter->drawLine(QLineF(x, 0, x, height() * m_stemSeparationProgress));
+    }
+
+    //: Text on waveform overview while AI stem separation runs for this track.
+    //: %1 is the current stage, %2 the progress in percent.
+    paintText(tr("%1 %2%")
+                      .arg(m_stemSeparationStatus,
+                              QString::number(static_cast<int>(
+                                      m_stemSeparationProgress * 100))),
+            pPainter);
+}
+#endif
 
 void WOverview::drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain) {
     for (auto&& markRange : m_markRanges) {

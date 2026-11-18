@@ -1,5 +1,6 @@
 #include "sources/soundsourceproxy.h"
 
+#include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QRegularExpression>
@@ -442,6 +443,40 @@ SoundSourceProxy::SoundSourceProxy(TrackPointer pTrack)
           m_providerRegistrations(allProviderRegistrationsForUrl(m_url)) {
     findProviderAndInitSoundSource();
 }
+
+SoundSourceProxy::SoundSourceProxy(TrackPointer pTrack, const QUrl& urlOverride)
+        : m_pTrack(std::move(pTrack)),
+          m_url(urlOverride),
+          m_providerRegistrations(allProviderRegistrationsForUrl(m_url)) {
+    findProviderAndInitSoundSource();
+}
+
+#ifdef __STEM_SEPARATION__
+SoundSourceProxy SoundSourceProxy::forPlayback(TrackPointer pTrack) {
+    // If AI-based stem separation has produced a STEM container for this
+    // track, play that back instead of the original file so that the
+    // existing STEM engine/UI pipeline (mute/solo, WTrackStemMenu, etc.)
+    // picks it up transparently. Unlike SoundSourceProxy(TrackPointer),
+    // this must only be used for actual playback, never for metadata
+    // import/export, which must always target the track's own file.
+    if (pTrack) {
+        const QString stemsPath = pTrack->getStemsPath();
+        if (!stemsPath.isEmpty()) {
+            if (QFileInfo::exists(stemsPath)) {
+                return SoundSourceProxy(pTrack, QUrl::fromLocalFile(stemsPath));
+            }
+            // The generated container has been deleted behind Mixxx's back
+            // (the folder under <settings>/stems/ is not managed by the
+            // library). Fall back to the track's own file rather than
+            // failing the load outright.
+            kLogger.warning()
+                    << "Generated STEM container" << stemsPath
+                    << "is missing, playing" << pTrack->getLocation() << "instead";
+        }
+    }
+    return SoundSourceProxy(pTrack);
+}
+#endif
 
 SoundSourceProxy::SoundSourceProxy(const QUrl& url)
         : m_url(url),

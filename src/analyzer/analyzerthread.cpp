@@ -127,9 +127,18 @@ void AnalyzerThread::doRun() {
         DEBUG_ASSERT(m_currentTrack.has_value());
         kLogger.debug() << "Analyzing" << m_currentTrack->getTrack()->getLocation();
 
-        // Get the audio
+        // Get the audio. Tracks with AI-generated stems are analyzed from
+        // the generated STEM container, like a pre-authored STEM file would
+        // be: analyzing the original file instead would store a stereo
+        // waveform (and stereo stream info) for a track the engine then
+        // plays back with 8 channels, hiding the stem UI.
         mixxx::AudioSourcePointer audioSource =
+#ifdef __STEM_SEPARATION__
+                SoundSourceProxy::forPlayback(m_currentTrack->getTrack())
+                        .openAudioSource(openParams);
+#else
                 SoundSourceProxy(m_currentTrack->getTrack()).openAudioSource(openParams);
+#endif
         if (!audioSource) {
             kLogger.warning()
                     << "Failed to open file for analyzing:"

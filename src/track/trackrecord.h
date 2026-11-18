@@ -57,6 +57,14 @@ class TrackRecord final {
     MIXXX_DECL_PROPERTY(mixxx::audio::FramePos, mainCuePosition, MainCuePosition)
     MIXXX_DECL_PROPERTY(int, rating, Rating)
     MIXXX_DECL_PROPERTY(bool, bpmLocked, BpmLocked)
+#ifdef __STEM_SEPARATION__
+    // Absolute path of the AI-generated STEM container file for this track,
+    // or an empty string if none has been generated yet. Unlike the STEM
+    // info of an embedded STEM file (which is re-derived from the track's
+    // own file contents on every load), this must be persisted because it
+    // cannot be recomputed cheaply from the original track file.
+    MIXXX_DECL_PROPERTY(QString, stemsPath, StemsPath)
+#endif
 
   public:
     // Data migration: Reload track total from file tags if not initialized

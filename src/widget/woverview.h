@@ -39,6 +39,12 @@ class WOverview : public WWidget, public TrackDropTarget {
     void slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void onTrackAnalyzerProgress(TrackId trackId,
             AnalyzerProgress analyzerProgress);
+#ifdef __STEM_SEPARATION__
+    void onStemSeparationProgress(TrackId trackId,
+            float progress,
+            const QString& statusMessage);
+    void onStemSeparationFinished(TrackId trackId, bool success);
+#endif
 
   signals:
     void trackDropped(const QString& filename, const QString& group) override;
@@ -94,6 +100,9 @@ class WOverview : public WWidget, public TrackDropTarget {
     void drawPlayPosition(QPainter* pPainter);
     void drawEndOfTrackFrame(QPainter* pPainter);
     void drawAnalyzerProgress(QPainter* pPainter);
+#ifdef __STEM_SEPARATION__
+    void drawStemSeparationProgress(QPainter* pPainter);
+#endif
     void drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain);
     void drawMarks(QPainter* pPainter, const float offset, const float gain);
     void drawPickupPosition(QPainter* pPainter);
@@ -186,6 +195,12 @@ class WOverview : public WWidget, public TrackDropTarget {
     double m_maxPixelPos;
 
     AnalyzerProgress m_analyzerProgress;
+#ifdef __STEM_SEPARATION__
+    /// Progress (0.0 ... 1.0) of the AI stem separation job running for the
+    /// shown track, or kStemSeparationProgressNone if there is none.
+    double m_stemSeparationProgress;
+    QString m_stemSeparationStatus;
+#endif
     bool m_trackLoaded;
     WaveformMarkPointer m_pHoveredMark;
     double m_scaleFactor;

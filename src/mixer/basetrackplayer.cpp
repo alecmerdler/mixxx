@@ -16,6 +16,9 @@
 #include "mixer/playerinfo.h"
 #include "mixer/playermanager.h"
 #include "moc_basetrackplayer.cpp"
+#ifdef __STEM_SEPARATION__
+#include "track/stemseparation/stemseparationcontroller.h"
+#endif
 #include "track/track.h"
 #include "util/sandbox.h"
 #include "vinylcontrol/defs_vinylcontrol.h"
@@ -27,6 +30,12 @@ constexpr double kNoTrackColor = -1;
 constexpr double kShiftCuesOffsetMillis = 10;
 constexpr double kShiftCuesOffsetSmallMillis = 1;
 const QString kEffectGroupFormat = QStringLiteral("[EqualizerRack1_%1_Effect1]");
+
+#ifdef __STEM_SEPARATION__
+// Value of [ChannelN],stem_separate_progress while no stem separation is
+// running for the loaded track. Running jobs report 0.0 ... 1.0.
+constexpr double kStemSeparationProgressIdle = -1;
+#endif
 
 inline double trackColorToDouble(mixxx::RgbColor::optional_t color) {
     return (color ? static_cast<double>(*color) : kNoTrackColor);
@@ -355,6 +364,34 @@ BaseTrackPlayerImpl::BaseTrackPlayerImpl(
         m_pStemColors.back()->setReadOnly();
     }
 #endif
+
+#ifdef __STEM_SEPARATION__
+    m_pStemSeparate = std::make_unique<ControlPushButton>(
+            ConfigKey(getGroup(), QStringLiteral("stem_separate")));
+    connect(m_pStemSeparate.get(),
+            &ControlObject::valueChanged,
+            this,
+            &BaseTrackPlayerImpl::slotStemSeparate);
+    m_pStemSeparateProgress = std::make_unique<ControlObject>(
+            ConfigKey(getGroup(), QStringLiteral("stem_separate_progress")));
+    m_pStemSeparateProgress->set(kStemSeparationProgressIdle);
+    m_pStemSeparateProgress->setReadOnly();
+    if (mixxx::StemSeparationController::isCreated()) {
+        auto* pStemSeparationController = mixxx::StemSeparationController::instance();
+        connect(pStemSeparationController,
+                &mixxx::StemSeparationController::separationFinished,
+                this,
+                &BaseTrackPlayerImpl::slotStemSeparationFinished);
+        connect(pStemSeparationController,
+                &mixxx::StemSeparationController::separationStarted,
+                this,
+                &BaseTrackPlayerImpl::slotStemSeparationStarted);
+        connect(pStemSeparationController,
+                &mixxx::StemSeparationController::separationProgress,
+                this,
+                &BaseTrackPlayerImpl::slotStemSeparationProgress);
+    }
+#endif
 }
 
 BaseTrackPlayerImpl::~BaseTrackPlayerImpl() {
@@ -481,6 +518,12 @@ TrackPointer BaseTrackPlayerImpl::unloadTrack() {
         for (const auto& stemColorCo : m_pStemColors) {
             stemColorCo->forceSet(kNoTrackColor);
         }
+    }
+#endif
+
+#ifdef __STEM_SEPARATION__
+    if (m_pStemSeparateProgress) {
+        m_pStemSeparateProgress->forceSet(kStemSeparationProgressIdle);
     }
 #endif
 
@@ -977,6 +1020,52 @@ void BaseTrackPlayerImpl::slotPlayToggled(double value) {
         setReplayGain(m_pLoadedTrack->getReplayGain().getRatio());
     }
 }
+
+#ifdef __STEM_SEPARATION__
+void BaseTrackPlayerImpl::slotStemSeparate(double pressed) {
+    if (pressed == 0 || !m_pLoadedTrack) {
+        return;
+    }
+    if (mixxx::StemSeparationController::isCreated()) {
+        mixxx::StemSeparationController::instance()->separateTrack(m_pLoadedTrack);
+    }
+}
+
+void BaseTrackPlayerImpl::slotStemSeparationStarted(TrackId trackId) {
+    if (!isStemSeparationTrackLoaded(trackId)) {
+        return;
+    }
+    m_pStemSeparateProgress->forceSet(0.0);
+}
+
+void BaseTrackPlayerImpl::slotStemSeparationProgress(
+        TrackId trackId, float progress, const QString& statusMessage) {
+    Q_UNUSED(statusMessage);
+    if (!isStemSeparationTrackLoaded(trackId)) {
+        return;
+    }
+    m_pStemSeparateProgress->forceSet(progress);
+}
+
+bool BaseTrackPlayerImpl::isStemSeparationTrackLoaded(TrackId trackId) const {
+    // m_pStemSeparateProgress only exists on primary decks.
+    return m_pStemSeparateProgress && m_pLoadedTrack &&
+            m_pLoadedTrack->getId() == trackId;
+}
+
+void BaseTrackPlayerImpl::slotStemSeparationFinished(TrackId trackId, bool success) {
+    if (!isStemSeparationTrackLoaded(trackId)) {
+        return;
+    }
+    m_pStemSeparateProgress->forceSet(kStemSeparationProgressIdle);
+    if (!success) {
+        return;
+    }
+    // Reload the track so the engine picks up the newly generated STEM
+    // container (see SoundSourceProxy::forPlayback()).
+    slotLoadTrack(m_pLoadedTrack, mixxx::StemChannelSelection(), false);
+}
+#endif
 
 EngineDeck* BaseTrackPlayerImpl::getEngineDeck() const {
     return m_pChannel;

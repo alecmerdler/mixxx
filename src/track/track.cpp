@@ -6,10 +6,14 @@
 #include <cmath>
 #include <utility>
 
+#include "engine/engine.h"
 #include "library/library_prefs.h"
 #include "moc_track.cpp"
 #include "sources/metadatasource.h"
 #include "track/keyfactory.h"
+#ifdef __STEM_SEPARATION__
+#include "track/stemseparation/stemseparator.h"
+#endif
 #include "util/assert.h"
 #include "util/logger.h"
 #include "util/time.h"
@@ -1498,6 +1502,26 @@ bool Track::importPendingStemInfosWhileLocked() {
 }
 #endif
 
+#ifdef __STEM_SEPARATION__
+void Track::setStemsPath(QString stemsPath) {
+    auto locked = QMutexLocker(&m_qMutex);
+    if (!compareAndSet(m_record.ptrStemsPath(), stemsPath)) {
+        return;
+    }
+    QList<StemInfo> stemInfos;
+    if (!stemsPath.isEmpty()) {
+        for (int i = 0; i < mixxx::kNumStemSeparationTargets; i++) {
+            const auto target = static_cast<mixxx::StemSeparationTarget>(i);
+            stemInfos.append(StemInfo(mixxx::stemSeparationTargetLabel(target),
+                    mixxx::stemSeparationTargetColor(target)));
+        }
+    }
+    setStemInfosWhileLocked(std::move(stemInfos));
+    markDirtyAndUnlock(&locked);
+    emit stemsUpdated();
+}
+#endif
+
 void Track::importPendingCueInfosMarkDirtyAndUnlock(
         QMutexLocker<QRecursiveMutex>* pLock) {
     DEBUG_ASSERT(pLock);
@@ -1958,7 +1982,15 @@ void Track::updateStreamInfoFromSource(
     const bool importBeats = m_pBeatsImporterPending && !m_pBeatsImporterPending->isEmpty();
     const bool importCueInfos = m_pCueInfoImporterPending && !m_pCueInfoImporterPending->isEmpty();
 #ifdef __STEM__
-    const bool importStemInfos = mixxx::StemInfoImporter::maybeStemFile(getLocation());
+    const bool importStemInfos =
+#ifdef __STEM_SEPARATION__
+            // AI-generated stems are described by the generated container,
+            // not by the track's own file, so re-importing from the latter
+            // (which happens for every mp4/m4a track, see maybeStemFile())
+            // would only clear what setStemsPath() has set up.
+            m_record.getStemsPath().isEmpty() &&
+#endif
+            mixxx::StemInfoImporter::maybeStemFile(getLocation());
 #endif
 
     if (!importBeats && !importCueInfos
